@@ -32,17 +32,16 @@ import selenium.webdriver.support.expected_conditions as EC
 import selenium.webdriver.support.ui as ui
 
 # local
-import martingale
 import timer
 
 
 pp = pprint.PrettyPrinter(indent=4)
 
-base_url = 'http://www.marketsworld.com'
+base_url = 'http://www.myadvertisingpays.com/'
 
 action_path = dict(
-    login = "",
-    bonuses = 'bonuses'
+    login = "Dot_memberlogin.asp?referURL=Dot_MembersPage.asp",
+    viewads = 'viewAds.asp'
 )
 
 one_minute    = 60
@@ -50,7 +49,7 @@ three_minutes = 3 * one_minute
 ten_minutes   = 10 * one_minute
 one_hour      = 3600
 
-# https://sheet.zoho.com/public/thequietcenter/martingale
+
 
 def hours_as_string(hours):
     if hours:
@@ -64,32 +63,6 @@ def session_as_string(i):
     else:
         return str(i)
 
-def mk_martseq(seed_bet, step_profit, step_reward, round_step):
-    return martingale.currency_ify(
-        martingale.sequence(seed_bet, step_profit, step_reward, round_step)
-    )
-
-def martingale_sequence(seed_bet, step_profit, step_reward, round_step):
-
-    martseq = mk_martseq(seed_bet, step_profit, step_reward, round_step)
-
-    return iter(martseq)
-
-def show_seq(seed_bet, step_profit, step_reward, round_step):
-
-    martseq = mk_martseq(seed_bet, step_profit, step_reward, round_step)
-
-    s = 0.0
-    gain_str = "{0}% gain on wager".format(step_reward * 100)
-    print("Step\tWager\tCumulative\t{0}".format(gain_str))
-    print("----\t-----\t----------\t-----------------")
-    for i, e in enumerate(martseq):
-        if i > 9:
-            break
-        e = float(e)
-        s += float(e)
-        p_gain = e + e * 0.7
-        print("{0}\t{1}\t{2}\t\t{3:.2f}".format(1+i, e, s, p_gain))
 
 
 def url_for_action(action):
@@ -143,45 +116,6 @@ maintenance_window = dict(
     finish=datetime.datetime.today().replace(hour=18, minute=05),
 )
 
-
-def in_maintenance_window():
-        """
-Natalie: Hello, welcome to Markets World, how may I help you?
-
-Terrence: hello...
-
-Terrence: what time of the day do the programmers halt all trading activity?
-
-Natalie: Our platform has binary trading available 24 hours 5 days a week whilst the world markets are open for trading. This is from Sunday 22:00 London (17:00 New York) to Friday at the same time.
-
-Terrence: yes, but trading was halted yesterday.
-
-Natalie: during 21:50 - 22:00 BST there is a 10 minute gap where all assets are close, this something occurs everyday due to how our platform was designed.
-
-Terrence: what is "BST"? I'm in the New York time zone.
-
-Natalie: BST means "British Summer Time"
-
-nTerrence: Is that the same at GMT?
-
-Natalie: 22:00 BST = 17:00 EST
-"""
-
-        current_time = datetime.datetime.now()
-
-
-        # for k,v in maintenance_window.iteritems():
-        #     print(k,v)
-
-        # print(current_time)
-
-        result = time_in_range(
-            maintenance_window['start'],
-            maintenance_window['finish'],
-            current_time
-        )
-        return result
-
 def my_time(dt):
     return dt.strftime('%I:%M%p')
 
@@ -189,17 +123,12 @@ def my_time(dt):
 class Entry(object):
 
     def __init__(
-            self, user, pass_, browser, direction, sessions, timer, trending
+            self, username, password, second_password, browser
     ):
-        self._user = user
-        self._pass = pass_
+        self._username = username
+        self._password = password
+        self._second_password = second_password
         self.browser = browser
-        self._initial_direction = direction
-        self.direction = direction
-        self.sessions = sessions
-        self.timer = timer
-        self._trending = trending
-        self.steps = []
 
     def run_stats(self):
         s = """
@@ -228,27 +157,61 @@ Average number of steps: {3}
 
     def login(self):
         print("Logging in...")
+
         self.browser.visit(url_for_action('login'))
-        self.browser.fill('user[email]', self._user)
-        self.browser.fill('user[password]', self._pass)
-        button = self.browser.find_by_name('submit').first
-        button.click()
 
-    def get_balance(self):
+        self.browser.find_by_name('username').type(self._username)
+        self.browser.find_by_name('password').type(self._password)
+        self.browser.find_by_value('Login').first.click()
 
-        lookup = '//span[@class="balance"]'
-        span = self.browser.find_by_xpath(lookup).first
-        print ("Balance: {0}".format(span['data-balance']))
+        time.sleep(1)
 
-    def select_asset(self):
+        self.browser.find_by_name('password2').type(self._second_password)
+
+        self.browser.find_by_value('Login').first.click()
+
+
+
+    def view_ads(self):
+        for i in xrange(1,11):
+            self.view_ad()
+            for i in progress.bar(range(40)):
+                time.sleep(1)
+
+
+    def view_ad(self):
+
         time.sleep(3)
-        self.browser.find_by_xpath(
-            '//*[@id="content_header"]/div/div/div[2]/a').click()
+
+        self.browser.visit(url_for_action('viewads'))
+
+        buttons = self.browser.find_by_css('.text_button')
+
+        #print("Found {0} buttons".format(buttons))
+
+        buttons[0].click()
+
+        self.solve_captcha()
+
+
+
+    def solve_captcha(self):
         time.sleep(3)
-        self.browser.find_link_by_text('Forex').first.click()
+        elem = self.browser.find_by_xpath(
+            "/html/body/form[@id='form1']/table/tbody/tr/td/table/tbody/tr[1]/td/font"
+        )
+        time.sleep(3)
+
+        (x, y, captcha) = elem.text.split()
+
+        print("CAPTCHA = {0}".format(captcha))
+
+        self.browser.find_by_name('codeSb').fill(captcha)
+
         time.sleep(6)
-        button = self.browser.find_by_xpath('//a[@title="EURUSD"]')
+        button = self.browser.find_by_name('Submit')
         button.click()
+
 
     def choose_direction(self):
         #time.sleep(6)
@@ -441,70 +404,19 @@ Session {0}/{1} completed. Pausing for {2} seconds.
 
 
 
-def main(username=None, password=None,
-         seed_bet=1.00, step_profit=1.00, step_reward=0.70,
-         round_step=False, show_sequence=False,
-         lower=False, max_hours=5,
-         sessions=1, nonstop=False, ignore_window=False,
-         trending=False
-     ):
+def main(username, password, second_password):
 
-    print("Seed bet = {0:.2f}. Step profit = {1:.2f}. Step Reward = {2}%".format(seed_bet, step_profit, step_reward*100, round_step))
 
-    show_seq(seed_bet, step_profit, step_reward, round_step)
-    if show_sequence:
-        sys.exit(0)
 
     with Browser() as browser:
 
         browser.driver.set_window_size(1200,1100)
 
-        if lower:
-            direction = 'lower'
-        else:
-            direction = 'higher'
 
-        if sessions:
-            if sessions < 0:
-                raise Exception("sessions must be a whole number")
-            else:
-                sessions = int(sessions)
-        elif nonstop:
-            sessions = -1
-
-        hours = max_hours
-
-        mytimer = timer.Timer(hours)
-
-        print("Number of ITMs to take:", session_as_string(sessions))
-        print("Number of hours to run:", hours_as_string(hours))
-
-        e = Entry(username, password, browser, direction, sessions, mytimer,
-                  trending
+        e = Entry(username, password, second_password, browser
               )
         e.login()
-        e.get_balance()
-        e.select_asset()
-
-
-        #pdb.set_trace()
-
-        session_list = range(1, sessions + 1) if sessions > 0 else itertools.count(1)
-        for session in session_list:
-            s = martingale_sequence(
-                seed_bet, step_profit, step_reward, round_step
-            )
-
-            e.tradeloop(session, s, ignore_window)
-            if mytimer.time_over():
-                print("Maximum execution hours reached.")
-                break
-
-            e.direction = e._initial_direction
-
-        e.run_stats()
-        e.browser.visit(url_for_action('bonuses'))
-        e.get_balance()
+        e.view_ads()
 
 def conda_main():
     argh.dispatch_command(main)
