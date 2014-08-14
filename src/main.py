@@ -35,6 +35,8 @@ import selenium.webdriver.support.ui as ui
 import timer
 
 
+random.seed()
+
 pp = pprint.PrettyPrinter(indent=4)
 
 base_url = 'http://www.myadvertisingpays.com/'
@@ -404,8 +406,12 @@ Session {0}/{1} completed. Pausing for {2} seconds.
 
 
 
-def main(username, password, second_password):
+def main(username, password, second_password,random_delay=False):
 
+    if random_delay:
+        random_delay = random.randint(1,15)
+        print("Random delay = {0}".format(random_delay))
+        time.sleep(one_minute * random_delay)
 
 
     with Browser() as browser:
@@ -415,6 +421,8 @@ def main(username, password, second_password):
 
         e = Entry(username, password, second_password, browser
               )
+
+
         e.login()
         e.view_ads()
 
