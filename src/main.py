@@ -9,7 +9,7 @@ sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
 # system
 from collections import defaultdict, Counter
 
-import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 import itertools
 import pdb
@@ -26,7 +26,7 @@ from clint.textui import progress
 import numpy
 from splinter import Browser
 
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import TimeoutException, UnexpectedAlertPresentException
 from selenium.webdriver.common.by import By
 import selenium.webdriver.support.expected_conditions as EC
 import selenium.webdriver.support.ui as ui
@@ -105,18 +105,6 @@ def current_time_log_format():
     return "[ {0} ]".format(current_time())
 
 
-def time_in_range(start, end, x):
-    """Return true if x is in the range [start, end]"""
-    if start <= end:
-        return start <= x <= end
-    else:
-        return start <= x or x <= end
-
-# http://www.binaryoptionsdaily.com/forums/general-group2/daily-profits-losses-screenshots-forum6/469-to-482-martingale-at-markets-world-thread2438.3/#postid-29237
-maintenance_window = dict(
-    start=datetime.datetime.today().replace(hour=14, minute=30),
-    finish=datetime.datetime.today().replace(hour=18, minute=05),
-)
 
 def my_time(dt):
     return dt.strftime('%I:%M%p')
@@ -125,12 +113,13 @@ def my_time(dt):
 class Entry(object):
 
     def __init__(
-            self, username, password, second_password, browser
+            self, username, password, second_password, browser, action
     ):
         self._username = username
         self._password = password
         self._second_password = second_password
         self.browser = browser
+        self.action = action
 
     def run_stats(self):
         s = """
@@ -176,25 +165,63 @@ Average number of steps: {3}
 
     def view_ads(self):
         for i in xrange(1,11):
-            self.view_ad()
-            for i in progress.bar(range(40)):
-                time.sleep(1)
+            while True:
+                result = self.view_ad()
+                if result == 0:
+                    continue
+
+
 
 
     def view_ad(self):
 
-        time.sleep(3)
-
         self.browser.visit(url_for_action('viewads'))
+        time.sleep(random.randrange(2,15))
 
-        buttons = self.browser.find_by_css('.text_button')
+        try:
+            buttons = self.browser.find_by_css('.text_button')
+        except UnexpectedAlertPresentException:
+            return 255
+
 
         #print("Found {0} buttons".format(buttons))
 
-        buttons[0].click()
+        buttons[random.randrange(0,5)].click()
 
         self.solve_captcha()
 
+        for i in progress.bar(range(40)):
+            time.sleep(1)
+
+        return 0
+
+
+    def calc_time(self):
+
+        time.sleep(3)
+
+        elem = self.browser.find_by_xpath(
+            '//table[@width="80%"]/tbody/tr/td[1]'
+        )
+
+        remaining = elem.text.split()
+        print(remaining)
+
+        indices = dict(
+            hours=17,
+            minutes=19
+        )
+
+        hours = int(remaining[indices['hours']])
+        minutes = int(remaining[indices['minutes']])
+
+        next_time  = datetime.now() + timedelta(
+            hours=hours, minutes=minutes)
+
+        print("Next time to click is {0}".format(
+            next_time.strftime("%Y-%m-%d %H:%M")))
+
+        loop_forever()
 
 
     def solve_captcha(self):
@@ -294,8 +321,8 @@ Average number of steps: {3}
     def show_progress_til_expiry(self, date_td):
         date_td
         date = date_td.value  # Apr 22, 19:25:00
-        dt = datetime.datetime.strptime(date, '%b %d, %H:%M:%S')
-        n = datetime.datetime.now()
+        dt = datetime.strptime(date, '%b %d, %H:%M:%S')
+        n = datetime.now()
         dt = dt.replace(n.year)
 
         diff = dt - n
@@ -406,7 +433,7 @@ Session {0}/{1} completed. Pausing for {2} seconds.
 
 
 
-def main(username, password, second_password,random_delay=False):
+def main(username, password, second_password,random_delay=False,action='click'):
 
     if random_delay:
         random_delay = random.randint(1,15)
@@ -419,12 +446,15 @@ def main(username, password, second_password,random_delay=False):
         browser.driver.set_window_size(1200,1100)
 
 
-        e = Entry(username, password, second_password, browser
+        e = Entry(username, password, second_password, browser, action
               )
 
-
         e.login()
-        e.view_ads()
+
+        if action == 'click':
+            e.view_ads()
+        if action == 'time':
+            e.calc_time()
 
 def conda_main():
     argh.dispatch_command(main)
