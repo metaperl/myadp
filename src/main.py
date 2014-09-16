@@ -7,10 +7,9 @@ import sys
 sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
 
 # system
-from collections import defaultdict, Counter
-
-from datetime import datetime, timedelta
-from functools import wraps
+from   collections import defaultdict, Counter
+from   datetime import datetime, timedelta
+from   functools import wraps
 import itertools
 import pdb
 import pprint
@@ -43,7 +42,8 @@ base_url = 'http://www.myadvertisingpays.com/'
 
 action_path = dict(
     login = "Dot_memberlogin.asp?referURL=Dot_MembersPage.asp",
-    viewads = 'viewAds.asp'
+    viewads = 'viewAds.asp',
+    dashboard = 'Dot_MembersPage.asp'
 )
 
 one_minute    = 60
@@ -64,6 +64,29 @@ def wait_visible(driver, locator, by=By.XPATH, timeout=30):
             EC.visibility_of_element_located((by, locator)))
     except TimeoutException:
         return False
+
+def trap_unexpected_alert(func):
+    @wraps(func)
+    def wrapper(self):
+        try:
+            return func(self)
+        except UnexpectedAlertPresentException:
+            print("Caught unexpected alert.")
+            return 254
+
+    return wrapper
+
+def trap_any(func):
+    @wraps(func)
+    def wrapper(self):
+        try:
+            return func(self)
+        except:
+            print("Caught exception.")
+            return 254
+
+    return wrapper
+
 
 class Entry(object):
 
@@ -92,37 +115,40 @@ class Entry(object):
         self.browser.find_by_value('Login').first.click()
 
     def view_ads(self):
-        for i in xrange(1,11):
+        for i in xrange(1,2):
+            print("Viewing ad {0}".format(i))
             while True:
                 result = self.view_ad()
                 if result == 0:
-                    continue
+                    break
 
+        self.calc_time(stay=False)
+
+
+    @trap_any
     def view_ad(self):
 
         self.browser.visit(url_for_action('viewads'))
-        time.sleep(random.randrange(2,15))
+        time.sleep(random.randrange(2,5))
 
-        try:
-            buttons = self.browser.find_by_css('.text_button')
-        except UnexpectedAlertPresentException:
-            return 255
-
-
+        buttons = self.browser.find_by_css('.text_button')
         #print("Found {0} buttons".format(buttons))
 
         buttons[0].click()
 
         self.solve_captcha()
 
-        for i in progress.bar(range(40)):
+        time_to_wait_on_ad = random.randrange(40,50)
+        for i in progress.bar(range(time_to_wait_on_ad)):
             time.sleep(1)
 
         return 0
 
-    def calc_time(self):
+    def calc_time(self, stay=True):
 
         time.sleep(3)
+
+        self.browser.visit(url_for_action('dashboard'))
 
         elem = self.browser.find_by_xpath(
             '//table[@width="80%"]/tbody/tr/td[1]'
@@ -145,7 +171,8 @@ class Entry(object):
         print("Next time to click is {0}".format(
             next_time.strftime("%Y-%m-%d %H:%M")))
 
-        loop_forever()
+        if stay:
+            loop_forever()
 
     def solve_captcha(self):
         time.sleep(3)
@@ -184,6 +211,7 @@ def main(username, password, second_password,random_delay=False,action='click'):
             e.view_ads()
         if action == 'time':
             e.calc_time()
+
 
 def conda_main():
     argh.dispatch_command(main)
