@@ -31,6 +31,7 @@ import selenium.webdriver.support.expected_conditions as EC
 import selenium.webdriver.support.ui as ui
 
 # local
+import conf
 import timer
 
 
@@ -87,15 +88,31 @@ def trap_any(func):
 
     return wrapper
 
+def trap_alert(func):
+    @wraps(func)
+    def wrapper(self):
+        try:
+            return func(self)
+        except UnexpectedAlertPresentException:
+            print("Caught UnexpectedAlertPresentException.")
+            return 254
+
+    return wrapper
+
 
 class Entry(object):
 
     def __init__(
-            self, username, password, second_password, browser, action
+            self, loginas, browser, action
     ):
-        self._username = username
-        self._password = password
-        self._second_password = second_password
+
+        modobj = sys.modules['conf']
+        print(modobj)
+        d = getattr(modobj, loginas)
+
+        self._username = d['username']
+        self._password = d['password']
+        self._second_password = d['password2']
         self.browser = browser
         self.action = action
 
@@ -115,7 +132,7 @@ class Entry(object):
         self.browser.find_by_value('Login').first.click()
 
     def view_ads(self):
-        for i in xrange(1,2):
+        for i in xrange(1,11):
             print("Viewing ad {0}".format(i))
             while True:
                 result = self.view_ad()
@@ -125,7 +142,7 @@ class Entry(object):
         self.calc_time(stay=False)
 
 
-    @trap_any
+    @trap_alert
     def view_ad(self):
 
         self.browser.visit(url_for_action('viewads'))
@@ -138,11 +155,22 @@ class Entry(object):
 
         self.solve_captcha()
 
+        #self.wait_on_ad()
+        self.wait_on_ad2()
+
+        return 0
+
+    def wait_on_ad(self):
         time_to_wait_on_ad = random.randrange(40,50)
         for i in progress.bar(range(time_to_wait_on_ad)):
             time.sleep(1)
 
-        return 0
+    def wait_on_ad2(self):
+        wait_visible(self.browser.driver,
+                     '//img[@src="images/moreadstop.gif"]',
+                     By.XPATH,
+                     60)
+
 
     def calc_time(self, stay=True):
 
@@ -191,7 +219,7 @@ class Entry(object):
         button = self.browser.find_by_name('Submit')
         button.click()
 
-def main(username, password, second_password,random_delay=False,action='click'):
+def main(loginas, random_delay=False, action='click'):
 
     if random_delay:
         random_delay = random.randint(1,15)
@@ -203,7 +231,7 @@ def main(username, password, second_password,random_delay=False,action='click'):
 
         browser.driver.set_window_size(1200,1100)
 
-        e = Entry(username, password, second_password, browser, action)
+        e = Entry(loginas, browser, action)
 
         e.login()
 
