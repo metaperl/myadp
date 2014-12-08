@@ -7,32 +7,28 @@ import sys
 sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
 
 # system
-from   collections import defaultdict, Counter
 from   datetime import datetime, timedelta
 from   functools import wraps
-import itertools
-import pdb
 import pprint
 import random
 import re
 import sys
 import time
-import traceback
+
 
 # pypi
 import argh
 from clint.textui import progress
-import numpy
 from splinter import Browser
 
-from selenium.common.exceptions import TimeoutException, UnexpectedAlertPresentException
+from selenium.common.exceptions import TimeoutException, UnexpectedAlertPresentException, WebDriverException
 from selenium.webdriver.common.by import By
 import selenium.webdriver.support.expected_conditions as EC
 import selenium.webdriver.support.ui as ui
 
 # local
-import conf
-import timer
+import conf  # it is used. Even though flymake cant figure that out.
+
 
 
 random.seed()
@@ -74,6 +70,9 @@ def trap_unexpected_alert(func):
         except UnexpectedAlertPresentException:
             print("Caught unexpected alert.")
             return 254
+        except WebDriverException:
+            print("Caught webdriver exception.")
+            return 254
 
     return wrapper
 
@@ -96,6 +95,10 @@ def trap_alert(func):
         except UnexpectedAlertPresentException:
             print("Caught UnexpectedAlertPresentException.")
             return 254
+        except WebDriverException:
+            print("Caught webdriver exception.")
+            return 253
+
 
     return wrapper
 
@@ -103,7 +106,7 @@ def trap_alert(func):
 class Entry(object):
 
     def __init__(
-            self, loginas, browser, action
+            self, loginas, browser, action, surf
     ):
 
         modobj = sys.modules['conf']
@@ -115,6 +118,7 @@ class Entry(object):
         self._second_password = d['password2']
         self.browser = browser
         self.action = action
+        self.surf = surf
 
     def login(self):
         print("Logging in...")
@@ -132,14 +136,15 @@ class Entry(object):
         self.browser.find_by_value('Login').first.click()
 
     def view_ads(self):
-        for i in xrange(1,11):
-            print("Viewing ad {0}".format(i))
+        for i in xrange(1, self.surf):
             while True:
+                print("Viewing ad {0}".format(i))
                 result = self.view_ad()
                 if result == 0:
                     break
 
         self.calc_time(stay=False)
+        self.calc_account_balance()
 
 
     @trap_alert
@@ -171,6 +176,22 @@ class Entry(object):
                      By.XPATH,
                      60)
 
+    def time_macro(self):
+        self.calc_account_balance()
+        self.calc_time()
+
+    def calc_account_balance(self):
+
+        time.sleep(3)
+
+        self.browser.visit(url_for_action('dashboard'))
+
+        elem = self.browser.find_by_xpath(
+            '/html/body/table[2]/tbody/tr/td[2]/table/tbody/tr/td[2]/table[6]/tbody/tr/td/table/tbody/tr[2]/td/h2[2]/font/font'
+        )
+
+        print("Available Account Balance: {}".format(elem.text))
+
 
     def calc_time(self, stay=True):
 
@@ -183,7 +204,8 @@ class Entry(object):
         )
 
         remaining = elem.text.split()
-        print(remaining)
+        for i, v in enumerate(remaining):
+            print(i,v)
 
         indices = dict(
             hours=17,
@@ -219,7 +241,7 @@ class Entry(object):
         button = self.browser.find_by_name('Submit')
         button.click()
 
-def main(loginas, random_delay=False, action='click'):
+def main(loginas, random_delay=False, action='click', stayup=False, surf=10):
 
     if random_delay:
         random_delay = random.randint(1,15)
@@ -231,14 +253,18 @@ def main(loginas, random_delay=False, action='click'):
 
         browser.driver.set_window_size(1200,1100)
 
-        e = Entry(loginas, browser, action)
+        e = Entry(loginas, browser, action, surf)
 
         e.login()
 
         if action == 'click':
             e.view_ads()
         if action == 'time':
-            e.calc_time()
+            e.time_macro()
+
+        if stayup:
+            e.time_macro()
+            loop_forever()
 
 
 def conda_main():
