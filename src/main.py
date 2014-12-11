@@ -136,7 +136,7 @@ class Entry(object):
         self.browser.find_by_value('Login').first.click()
 
     def view_ads(self):
-        for i in xrange(1, self.surf):
+        for i in xrange(1, self.surf+1):
             while True:
                 print("Viewing ad {0}".format(i))
                 result = self.view_ad()
