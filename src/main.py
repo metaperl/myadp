@@ -6,9 +6,10 @@ import os
 import sys
 sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
 
-# system
+# core
 from   datetime import datetime, timedelta
 from   functools import wraps
+import logging
 import pprint
 import random
 import re
@@ -20,7 +21,6 @@ import time
 import argh
 from clint.textui import progress
 from splinter import Browser
-
 from selenium.common.exceptions import TimeoutException, UnexpectedAlertPresentException, WebDriverException
 from selenium.webdriver.common.by import By
 import selenium.webdriver.support.expected_conditions as EC
@@ -29,6 +29,10 @@ import selenium.webdriver.support.ui as ui
 # local
 import conf  # it is used. Even though flymake cant figure that out.
 
+logging.basicConfig(
+    format='%(lineno)s %(message)s',
+    level=logging.WARN
+)
 
 
 random.seed()
@@ -123,7 +127,7 @@ class Entry(object):
     def login(self):
         print("Logging in...")
 
-        self.browser.visit(url_for_action('login'))
+        self.browser_visit('login')
 
         self.browser.find_by_name('username').type(self._username)
         self.browser.find_by_name('password').type(self._password)
@@ -135,6 +139,22 @@ class Entry(object):
 
         self.browser.find_by_value('Login').first.click()
 
+    def browser_visit(self, action_label):
+        try:
+            logging.warn("Visiting URL for {0}".format(action_label))
+            self.browser.visit(url_for_action(action_label))
+            return 0
+        except UnexpectedAlertPresentException:
+            print("Caught UnexpectedAlertPresentException.")
+            logging.warn("Attempting to dismiss alert")
+            alert = self.driver.switch_to_alert()
+            alert.dismiss()
+            return 254
+        except WebDriverException:
+            print("Caught webdriver exception.")
+            return 253
+
+
     def view_ads(self):
         for i in xrange(1, self.surf+1):
             while True:
@@ -143,24 +163,27 @@ class Entry(object):
                 if result == 0:
                     break
 
-        self.calc_time(stay=False)
         self.calc_account_balance()
-
+        self.calc_time(stay=False)
 
     @trap_alert
     def view_ad(self):
 
-        self.browser.visit(url_for_action('viewads'))
+        logging.warn("Visiting viewads")
+        self.browser_visit('viewads')
         time.sleep(random.randrange(2,5))
 
+        logging.warn("Finding text_button")
         buttons = self.browser.find_by_css('.text_button')
-        #print("Found {0} buttons".format(buttons))
 
+        logging.warn("Clicking button")
         buttons[0].click()
 
+        logging.warn("Solving captcha")
         self.solve_captcha()
 
         #self.wait_on_ad()
+        logging.warn("wait_on_ad2")
         self.wait_on_ad2()
 
         return 0
@@ -184,8 +207,10 @@ class Entry(object):
 
         time.sleep(3)
 
-        self.browser.visit(url_for_action('dashboard'))
+        logging.warn("visiting dashboard")
+        self.browser_visit('dashboard')
 
+        logging.warn("finding element by xpath")
         elem = self.browser.find_by_xpath(
             '/html/body/table[2]/tbody/tr/td[2]/table/tbody/tr/td[2]/table[6]/tbody/tr/td/table/tbody/tr[2]/td/h2[2]/font/font'
         )
@@ -197,7 +222,7 @@ class Entry(object):
 
         time.sleep(3)
 
-        self.browser.visit(url_for_action('dashboard'))
+        self.browser_visit('dashboard')
 
         elem = self.browser.find_by_xpath(
             '//table[@width="80%"]/tbody/tr/td[1]'
