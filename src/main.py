@@ -66,6 +66,7 @@ def wait_visible(driver, locator, by=By.XPATH, timeout=30):
     except TimeoutException:
         return False
 
+
 def trap_unexpected_alert(func):
     @wraps(func)
     def wrapper(self):
@@ -80,6 +81,7 @@ def trap_unexpected_alert(func):
 
     return wrapper
 
+
 def trap_any(func):
     @wraps(func)
     def wrapper(self):
@@ -90,6 +92,7 @@ def trap_any(func):
             return 254
 
     return wrapper
+
 
 def trap_alert(func):
     @wraps(func)
@@ -103,9 +106,11 @@ def trap_alert(func):
             print("Caught webdriver exception.")
             return 253
 
-
     return wrapper
 
+
+def get_element_html(driver, elem):
+    return driver.execute_script("return arguments[0].innerHTML;", elem)
 
 class Entry(object):
 
@@ -154,7 +159,6 @@ class Entry(object):
             print("Caught webdriver exception.")
             return 253
 
-
     def view_ads(self):
         for i in xrange(1, self.surf+1):
             while True:
@@ -165,13 +169,14 @@ class Entry(object):
 
         self.calc_account_balance()
         self.calc_time(stay=False)
+        self.buy_pack()
 
     @trap_alert
     def view_ad(self):
 
         logging.warn("Visiting viewads")
         self.browser_visit('viewads')
-        time.sleep(random.randrange(2,5))
+        time.sleep(random.randrange(2, 5))
 
         logging.warn("Finding text_button")
         buttons = self.browser.find_by_css('.text_button')
@@ -203,9 +208,28 @@ class Entry(object):
         self.calc_account_balance()
         self.calc_time()
 
+    def buy_pack(self):
+        self.calc_account_balance()
+        print("Balance: {}".format(self.account_balance))
+        if self.account_balance >= 49.99:
+            self._buy_pack()
+
+    def _buy_pack(self):
+        a = self.browser.find_by_xpath(
+            '//a[@href="Dot_CreditPack.asp"]'
+        )
+        print("A: {0}".format(a))
+        a.click()
+
+        button = wait_visible(self.browser.driver, 'Preview', by=By.NAME)
+        button.click()
+
+        button = wait_visible(self.browser.driver, 'Preview', by=By.NAME)
+        button.click()
+
     def calc_account_balance(self):
 
-        time.sleep(3)
+        time.sleep(1)
 
         logging.warn("visiting dashboard")
         self.browser_visit('dashboard')
@@ -215,8 +239,24 @@ class Entry(object):
             '/html/body/table[2]/tbody/tr/td[2]/table/tbody/tr/td[2]/table[6]/tbody/tr/td/table/tbody/tr[2]/td/h2[2]/font/font'
         )
 
+        self.account_balance = float(elem.text[1:])
+
         print("Available Account Balance: {}".format(elem.text))
 
+    def calc_clicked(self):
+
+        time.sleep(1)
+
+        logging.warn("visiting dashboard")
+        self.browser_visit('dashboard')
+
+        logging.warn("finding element by xpath")
+        elem = self.browser.find_by_xpath(
+            '/html/body/table[2]/tbody/tr/td[2]/table/tbody/tr/td[2]/table[2]/tbody/tr/td'
+        )
+
+        print ("The click status box says: {0}".format(
+            get_element_html(self.browser.driver, elem[0]._element)))
 
     def calc_time(self, stay=True):
 
@@ -230,7 +270,7 @@ class Entry(object):
 
         remaining = elem.text.split()
         for i, v in enumerate(remaining):
-            print(i,v)
+            print(i, v)
 
         indices = dict(
             hours=17,
@@ -281,11 +321,14 @@ def main(loginas, random_delay=False, action='click', stayup=False, surf=10):
         e = Entry(loginas, browser, action, surf)
 
         e.login()
+        e.calc_clicked()
 
         if action == 'click':
             e.view_ads()
         if action == 'time':
             e.time_macro()
+        if action == 'buy':
+            e.buy_pack()
 
         if stayup:
             e.time_macro()
