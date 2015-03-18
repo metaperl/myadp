@@ -243,11 +243,27 @@ class Entry(object):
 
         print("Available Account Balance: {}".format(elem.text))
 
-    def calc_clicked(self):
+    def calc_credit_packs(self):
 
         time.sleep(1)
 
         logging.warn("visiting dashboard")
+        self.browser_visit('dashboard')
+
+        logging.warn("finding element by xpath")
+        elem = self.browser.find_by_xpath(
+            "//font[@color='#009900']"
+        )
+
+        print("Active credit packs = {0}".format(elem[0].text))
+        # for i, e in enumerate(elem):
+        #     print("{0}, {1}".format(i, e.text))
+
+
+    def calc_clicked(self):
+
+        time.sleep(1)
+
         self.browser_visit('dashboard')
 
         logging.warn("finding element by xpath")
@@ -322,6 +338,8 @@ def main(loginas, random_delay=False, action='click', stayup=False, surf=10):
 
         e.login()
         e.calc_clicked()
+        e.calc_credit_packs()
+
 
         if action == 'click':
             e.view_ads()
