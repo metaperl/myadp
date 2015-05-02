@@ -1,3 +1,4 @@
 argh
 clint
+funcy
 splinter

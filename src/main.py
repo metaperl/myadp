@@ -20,6 +20,7 @@ import time
 # pypi
 import argh
 from clint.textui import progress
+import funcy
 from splinter import Browser
 from selenium.common.exceptions import TimeoutException, UnexpectedAlertPresentException, WebDriverException
 from selenium.webdriver.common.by import By
@@ -59,13 +60,17 @@ def url_for_action(action):
 def loop_forever():
     while True: pass
 
+def page_source(browser):
+    document_root = browser.driver.page_source
+    return document_root
+
+
 def wait_visible(driver, locator, by=By.XPATH, timeout=30):
     try:
         return ui.WebDriverWait(driver, timeout).until(
             EC.visibility_of_element_located((by, locator)))
     except TimeoutException:
         return False
-
 
 def trap_unexpected_alert(func):
     @wraps(func)
@@ -146,7 +151,7 @@ class Entry(object):
 
     def browser_visit(self, action_label):
         try:
-            logging.warn("Visiting URL for {0}".format(action_label))
+            logging.debug("Visiting URL for {0}".format(action_label))
             self.browser.visit(url_for_action(action_label))
             return 0
         except UnexpectedAlertPresentException:
@@ -266,13 +271,28 @@ class Entry(object):
 
         self.browser_visit('dashboard')
 
-        logging.warn("finding element by xpath")
+        #logging.warn("finding element by xpath")
         elem = self.browser.find_by_xpath(
             '/html/body/table[2]/tbody/tr/td[2]/table/tbody/tr/td[2]/table[2]/tbody/tr/td'
         )
 
-        print ("The click status box says: {0}".format(
-            get_element_html(self.browser.driver, elem[0]._element)))
+        # The click status box says: <div align="center"><strong><font color="#FFFFFF">Surf Clicked Today: 0<br>You have clicked on 10 ads within the last 24 hours<br>
+        # The click status box says: <div align="center"><strong><font color="#FFFFFF">Surf Clicked Today: 6<br>You have NOT clicked on 10 ads within the last 24 hours<br>
+
+        html = get_element_html(self.browser.driver, elem[0]._element)
+        find = html.find("You have NOT clicked on")
+
+        print("HTML={0}. Find={1}.".format(html, find))
+
+        if html.find("You have NOT clicked on") != -1:
+            return -1
+        else:
+            clicked = funcy.silent(int)(
+                funcy.re_find(r'You have clicked on (\d+)', html))
+            return clicked
+
+        raise("Could not calculate clicked.")
+
 
     def calc_time(self, stay=True):
 
@@ -307,14 +327,14 @@ class Entry(object):
 
     def solve_captcha(self):
         time.sleep(3)
-        elem = self.browser.find_by_xpath(
-            "/html/body/form[@id='form1']/table/tbody/tr/td/table/tbody/tr[1]/td/font"
-        )
-        time.sleep(3)
 
-        (x, y, captcha) = elem.text.split()
+        t = page_source(self.browser).encode('utf-8').strip()
+        #print("Page source {0}".format(t))
 
-        print("CAPTCHA = {0}".format(captcha))
+        captcha = funcy.re_find(
+            """ctx.strokeText\('(\d+)'""", t)
+
+        #print("CAPTCHA = {0}".format(captcha))
 
         self.browser.find_by_name('codeSb').fill(captcha)
 
@@ -337,15 +357,22 @@ def main(loginas, random_delay=False, action='click', stayup=False, surf=10):
         e = Entry(loginas, browser, action, surf)
 
         e.login()
-        e.calc_clicked()
+        clicked = e.calc_clicked()
+        print("Amount of ads clicked={0}.".format(clicked))
         e.calc_credit_packs()
 
+
+        print ("Action = " + action)
 
         if action == 'click':
             e.view_ads()
         if action == 'time':
             e.time_macro()
         if action == 'buy':
+            e.buy_pack()
+        if action == 'check':
+            if clicked < 10:
+                e.view_ads()
             e.buy_pack()
 
         if stayup:
