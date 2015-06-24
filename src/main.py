@@ -16,7 +16,6 @@ import re
 import sys
 import time
 
-
 # pypi
 import argh
 from clint.textui import progress
@@ -24,17 +23,18 @@ import funcy
 from splinter import Browser
 from selenium.common.exceptions import TimeoutException, UnexpectedAlertPresentException, WebDriverException
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 import selenium.webdriver.support.expected_conditions as EC
 import selenium.webdriver.support.ui as ui
 
 # local
 import conf  # it is used. Even though flymake cant figure that out.
 
+
 logging.basicConfig(
     format='%(lineno)s %(message)s',
     level=logging.WARN
 )
-
 
 random.seed()
 
@@ -45,7 +45,8 @@ base_url = 'http://www.myadvertisingpays.com/'
 action_path = dict(
     login = "Dot_memberlogin.asp?referURL=Dot_MembersPage.asp",
     viewads = 'viewAds.asp',
-    dashboard = 'Dot_MembersPage.asp'
+    dashboard = 'Dot_MembersPage.asp',
+    withdraw = 'DotwithdrawForm.asp'
 )
 
 one_minute    = 60
@@ -60,10 +61,14 @@ def url_for_action(action):
 def loop_forever():
     while True: pass
 
+def clear_input_box(i):
+    i.type(Keys.CONTROL + "a");
+    i.type(Keys.DELETE);
+    return i
+
 def page_source(browser):
     document_root = browser.driver.page_source
     return document_root
-
 
 def wait_visible(driver, locator, by=By.XPATH, timeout=30):
     try:
@@ -86,7 +91,6 @@ def trap_unexpected_alert(func):
 
     return wrapper
 
-
 def trap_any(func):
     @wraps(func)
     def wrapper(self):
@@ -97,7 +101,6 @@ def trap_any(func):
             return 254
 
     return wrapper
-
 
 def trap_alert(func):
     @wraps(func)
@@ -113,9 +116,9 @@ def trap_alert(func):
 
     return wrapper
 
-
 def get_element_html(driver, elem):
     return driver.execute_script("return arguments[0].innerHTML;", elem)
+
 
 class Entry(object):
 
@@ -130,6 +133,7 @@ class Entry(object):
         self._username = d['username']
         self._password = d['password']
         self._second_password = d['password2']
+        self._pin = d['pin']
         self.browser = browser
         self.action = action
         self.surf = surf
@@ -218,6 +222,19 @@ class Entry(object):
         print("Balance: {}".format(self.account_balance))
         if self.account_balance >= 49.99:
             self._buy_pack()
+
+    def withdraw(self):
+        self.calc_account_balance()
+        self.browser_visit('withdraw')
+        select = ui.Select(
+            self.browser.driver.find_element_by_id("withdrawPmt"))
+        select.select_by_visible_text("Solid Trust Pay")
+        i = self.browser.find_by_name('withdrawAmt')
+        clear_input_box(i).type(str(self.account_balance))
+        self.browser.find_by_name('transPin').type(self._pin)
+        wait_visible(self.browser.driver, 'Submit4', by=By.NAME).click()
+        wait_visible(self.browser.driver, 'Submit465', by=By.NAME).click()
+        loop_forever()
 
     def _buy_pack(self):
         a = self.browser.find_by_xpath(
@@ -370,10 +387,12 @@ def main(loginas, random_delay=False, action='click', stayup=False, surf=10):
             e.time_macro()
         if action == 'buy':
             e.buy_pack()
+        if action == 'withdraw':
+            e.withdraw()
         if action == 'check':
             if clicked < 10:
                 e.view_ads()
-            e.buy_pack()
+            #e.buy_pack()
 
         if stayup:
             e.time_macro()
