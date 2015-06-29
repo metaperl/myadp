@@ -43,32 +43,36 @@ pp = pprint.PrettyPrinter(indent=4)
 base_url = 'http://www.myadvertisingpays.com/'
 
 action_path = dict(
-    login = "Dot_memberlogin.asp?referURL=Dot_MembersPage.asp",
-    viewads = 'viewAds.asp',
-    dashboard = 'Dot_MembersPage.asp',
-    withdraw = 'DotwithdrawForm.asp'
+    login="Dot_memberlogin.asp?referURL=Dot_MembersPage.asp",
+    viewads='viewAds.asp',
+    dashboard='Dot_MembersPage.asp',
+    withdraw='DotwithdrawForm.asp'
 )
 
-one_minute    = 60
+one_minute = 60
 three_minutes = 3 * one_minute
-ten_minutes   = 10 * one_minute
-one_hour      = 3600
+ten_minutes = 10 * one_minute
+one_hour = 3600
 
 
 def url_for_action(action):
     return "{0}/{1}".format(base_url, action_path[action])
 
+
 def loop_forever():
     while True: pass
 
+
 def clear_input_box(i):
-    i.type(Keys.CONTROL + "a");
-    i.type(Keys.DELETE);
+    i.type(Keys.CONTROL + "a")
+    i.type(Keys.DELETE)
     return i
+
 
 def page_source(browser):
     document_root = browser.driver.page_source
     return document_root
+
 
 def wait_visible(driver, locator, by=By.XPATH, timeout=30):
     try:
@@ -76,6 +80,7 @@ def wait_visible(driver, locator, by=By.XPATH, timeout=30):
             EC.visibility_of_element_located((by, locator)))
     except TimeoutException:
         return False
+
 
 def trap_unexpected_alert(func):
     @wraps(func)
@@ -91,6 +96,7 @@ def trap_unexpected_alert(func):
 
     return wrapper
 
+
 def trap_any(func):
     @wraps(func)
     def wrapper(self):
@@ -101,6 +107,7 @@ def trap_any(func):
             return 254
 
     return wrapper
+
 
 def trap_alert(func):
     @wraps(func)
@@ -115,6 +122,7 @@ def trap_alert(func):
             return 253
 
     return wrapper
+
 
 def get_element_html(driver, elem):
     return driver.execute_script("return arguments[0].innerHTML;", elem)
@@ -168,7 +176,7 @@ class Entry(object):
             print("Caught webdriver exception.")
             return 253
 
-    def view_ads(self):
+    def view_ads(self, buy_pack=False):
         for i in xrange(1, self.surf+1):
             while True:
                 print("Viewing ad {0}".format(i))
@@ -178,7 +186,8 @@ class Entry(object):
 
         self.calc_account_balance()
         self.calc_time(stay=False)
-        self.buy_pack()
+        if buy_pack:
+            self.buy_pack()
 
     @trap_alert
     def view_ad(self):
@@ -196,14 +205,13 @@ class Entry(object):
         logging.warn("Solving captcha")
         self.solve_captcha()
 
-        #self.wait_on_ad()
         logging.warn("wait_on_ad2")
         self.wait_on_ad2()
 
         return 0
 
     def wait_on_ad(self):
-        time_to_wait_on_ad = random.randrange(40,50)
+        time_to_wait_on_ad = random.randrange(40, 50)
         for i in progress.bar(range(time_to_wait_on_ad)):
             time.sleep(1)
 
@@ -281,7 +289,6 @@ class Entry(object):
         # for i, e in enumerate(elem):
         #     print("{0}, {1}".format(i, e.text))
 
-
     def calc_clicked(self):
 
         time.sleep(1)
@@ -310,7 +317,6 @@ class Entry(object):
 
         raise("Could not calculate clicked.")
 
-
     def calc_time(self, stay=True):
 
         time.sleep(3)
@@ -333,7 +339,7 @@ class Entry(object):
         hours = int(remaining[indices['hours']])
         minutes = int(remaining[indices['minutes']])
 
-        next_time  = datetime.now() + timedelta(
+        next_time = datetime.now() + timedelta(
             hours=hours, minutes=minutes)
 
         print("Next time to click is {0}".format(
@@ -362,14 +368,13 @@ class Entry(object):
 def main(loginas, random_delay=False, action='click', stayup=False, surf=10):
 
     if random_delay:
-        random_delay = random.randint(1,15)
+        random_delay = random.randint(1, 15)
         print("Random delay = {0}".format(random_delay))
         time.sleep(one_minute * random_delay)
 
-
     with Browser() as browser:
 
-        browser.driver.set_window_size(1200,1100)
+        browser.driver.set_window_size(1200, 1100)
 
         e = Entry(loginas, browser, action, surf)
 
@@ -377,7 +382,6 @@ def main(loginas, random_delay=False, action='click', stayup=False, surf=10):
         clicked = e.calc_clicked()
         print("Amount of ads clicked={0}.".format(clicked))
         e.calc_credit_packs()
-
 
         print ("Action = " + action)
 
@@ -392,7 +396,7 @@ def main(loginas, random_delay=False, action='click', stayup=False, surf=10):
         if action == 'check':
             if clicked < 10:
                 e.view_ads()
-            #e.buy_pack()
+            # e.buy_pack()
 
         if stayup:
             e.time_macro()
